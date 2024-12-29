@@ -50,7 +50,6 @@ namespace Durable.Function.TxDataPatch.Validation.ValidationCheck
                     if (!isValid)
                     {
                         await InsertData(blobName, jsonObject, validationErrors, log);
-
                     }
                     else
                     {
@@ -62,16 +61,20 @@ namespace Durable.Function.TxDataPatch.Validation.ValidationCheck
             {
                 log.LogError($"Error processing Json array in blob '{blobName}': {ex}");
             }
-
         }
 
         private async Task InsertData(string blobName, JObject jsonObject, IList<string> validationErrors, ILogger log)
         {
             try
             {
+                // Get the correlationId and handle potential null
                 string correlationId = GetCorrelationId(jsonObject, log);
-                processedCorrelationIds.Add(correlationId);
 
+                // Ensure the correlationId is non-null or empty before adding it to the set
+                if (!string.IsNullOrEmpty(correlationId))
+                {
+                    processedCorrelationIds.Add(correlationId);
+                }
 
                 string storageConnectionString = _config.StorageConnectionString;
                 string validationStatus = jsonObject.IsValid(_schema) ? "Valid" : "Invalid";
@@ -96,25 +99,30 @@ namespace Durable.Function.TxDataPatch.Validation.ValidationCheck
             }
         }
 
+
+
         private async Task StoreValidJsonData(string json, string blobName, string id, ILogger log)
         {
             await _blobStorageManager.StoreValidJsonInBlobStorage(json, blobName, id, log);
         }
+
         private async Task StoreInValidJsonData(string json, string blobName, string id, ILogger log)
         {
             await _blobStorageManager.StoreInValidJsonInBlobStorage(json, blobName, id, log);
         }
+
+        // Modified method to return an empty string instead of null
         private string GetCorrelationId(JObject jsonObject, ILogger log)
         {
             try
             {
                 var customer = jsonObject.ToObject<TxDataTracker>();
-                return customer?.customerTechnicalHeader?.correlationId;
+                return customer?.customerTechnicalHeader?.correlationId ?? string.Empty; // Default to empty string if null
             }
             catch (Exception ex)
             {
                 log.LogError($"Error extracting correlationId: {ex}");
-                return null;
+                return string.Empty; // Default to empty string on error
             }
         }
     }
